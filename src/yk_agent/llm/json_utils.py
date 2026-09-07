@@ -8,7 +8,7 @@ import logging
 
 from pydantic import BaseModel, ValidationError
 
-from yk_agent.llm.models import ChatMessage
+from yk_agent.llm.models import ChatMessage, ChatResult
 from yk_agent.llm.provider import LLMProvider
 
 logger = logging.getLogger(__name__)
@@ -23,22 +23,25 @@ class SchemaValidationError(RuntimeError):
     """重试后仍未产出合法结构化结果。"""
 
 
-async def chat_validated[T: BaseModel](
+async def chat_validated_detailed[T: BaseModel](
     provider: LLMProvider,
     messages: list[ChatMessage],
     schema: type[T],
     *,
     model: str | None = None,
     **sampling,
-) -> T:
-    """调用 chat(json_mode=True) 并用 schema 校验，失败时带错误提示重试一次。"""
+) -> tuple[T, ChatResult]:
+    """chat(json_mode=True) + schema 校验 + 失败带错误提示重试一次。
+
+    返回 (校验后的对象, 原始 ChatResult)——编排护栏需要 usage 做 token 统计时用本接口。
+    """
     conversation = list(messages)
     last_err: Exception | None = None
 
     for attempt in range(2):  # 首次 + 重试 1 次
         result = await provider.chat(conversation, model=model, json_mode=True, **sampling)
         try:
-            return schema.model_validate_json(result.content)
+            return schema.model_validate_json(result.content), result
         except ValidationError as e:
             last_err = e
             logger.warning("结构化输出校验失败（第 %d 次）: %s", attempt + 1, e)
@@ -48,3 +51,16 @@ async def chat_validated[T: BaseModel](
             ]
 
     raise SchemaValidationError(f"结构化输出两次校验均失败: {last_err}") from last_err
+
+
+async def chat_validated[T: BaseModel](
+    provider: LLMProvider,
+    messages: list[ChatMessage],
+    schema: type[T],
+    *,
+    model: str | None = None,
+    **sampling,
+) -> T:
+    """只要校验后对象、不关心 token 用量的便捷封装。"""
+    obj, _ = await chat_validated_detailed(provider, messages, schema, model=model, **sampling)
+    return obj
