@@ -33,13 +33,13 @@
 # src/yk_agent/agents/registry.py
 @dataclass(frozen=True)
 class AgentSpec:
-    name: str                      # 如 "poi-agent"
-    description: str               # 给 LLM 看的能力描述——质量直接决定编排质量，必须写清楚
-                                 # 【能做什么/输入是什么/输出是什么/什么场景该选它】
+    name: str  # 如 "poi-agent"
+    description: str  # 给 LLM 看的能力描述——质量直接决定编排质量，必须写清楚
+    # 【能做什么/输入是什么/输出是什么/什么场景该选它】
     input_schema: type[BaseModel]  # pydantic 入参校验
-    output_schema: type[BaseModel] # pydantic 出参校验
-    side_effect: bool = False      # 是否有副作用（True 则派发前必须人工确认）
-    graph_node: str                # LangGraph 节点名
+    output_schema: type[BaseModel]  # pydantic 出参校验
+    side_effect: bool = False  # 是否有副作用（True 则派发前必须人工确认）
+    graph_node: str  # LangGraph 节点名
 ```
 
 Orchestrator 的 system prompt 中注入 Registry 清单（name + description + input/output schema 摘要）。
@@ -51,21 +51,22 @@ class TripState(TypedDict):
     # —— 只读上下文（Orchestrator 注入，子智能体不可修改）——
     session_id: str
     user_id: str
-    user_profile: UserProfile          # 画像切片（见 04 文档）
+    user_profile: UserProfile  # 画像切片（见 04 文档）
     user_message: str
     # —— 编排控制 ——
-    plan: list[PlanTask]               # 当前计划，Orchestrator 可修订
+    plan: list[PlanTask]  # 当前计划，Orchestrator 可修订
     critic_verdict: CriticVerdict | None
-    steps_done: int                    # 护栏计数
+    steps_done: int  # 护栏计数
     # —— 产出累积 ——
     findings: dict[str, AgentFinding]  # key=agent name，各子智能体结构化产出
     final_answer: str | None
-    messages: Annotated[list, add_messages]   # Orchestrator 的推理消息历史
+    messages: Annotated[list, add_messages]  # Orchestrator 的推理消息历史
+
 
 class PlanTask(BaseModel):
-    agent: str                 # Registry 中的 name
-    instruction: str           # 具体任务描述（含依赖产出如何使用）
-    depends_on: list[str]      # 依赖的 agent name 列表（去重后无依赖 → 并行派发）
+    agent: str  # Registry 中的 name
+    instruction: str  # 具体任务描述（含依赖产出如何使用）
+    depends_on: list[str]  # 依赖的 agent name 列表（去重后无依赖 → 并行派发）
 ```
 
 ## 执行规则（Orchestrator 必须遵守）

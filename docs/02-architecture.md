@@ -67,8 +67,14 @@
 
 ```python
 class LLMProvider(Protocol):
-    async def chat(self, messages: list[ChatMessage], *, model: str | None = None,
-                   json_mode: bool = False, **sampling) -> ChatResult: ...
+    async def chat(
+        self,
+        messages: list[ChatMessage],
+        *,
+        model: str | None = None,
+        json_mode: bool = False,
+        **sampling,
+    ) -> ChatResult: ...
     async def embed(self, texts: list[str]) -> list[list[float]]: ...
 ```
 
