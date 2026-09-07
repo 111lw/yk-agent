@@ -21,3 +21,6 @@ build/
 # 运行时产物
 logs/
 *.sqlite3
+
+# conda 建环境临时产物
+condaenv.*.requirements.txt
