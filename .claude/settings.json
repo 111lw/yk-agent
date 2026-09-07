@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pytest:*)",
+      "Bash(ruff check:*)",
+      "Bash(ruff format:*)",
+      "Bash(uvicorn:*)",
+      "Bash(python scripts/*:*)",
+      "Bash(pip install:*)"
+    ]
+  }
+}

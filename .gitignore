@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# 工具缓存
+.pytest_cache/
+.ruff_cache/
+
+# 环境与密钥
+.env
+.env.*
+*.key
+
+# IDE
+.idea/
+.vscode/
+
+# 运行时产物
+logs/
+*.sqlite3

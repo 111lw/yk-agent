@@ -1,0 +1,8 @@
+name: yk-agent
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - -e ".[dev]"   # 本体及依赖统一由 pyproject.toml 管理，避免两处维护
