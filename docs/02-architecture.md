@@ -85,5 +85,5 @@ class LLMProvider(Protocol):
 
 ## 配置管理
 
-- 全部配置经 `pydantic-settings` 从环境变量 / `.env` 读取（`yk_agent/config.py`），包括：`ARK_API_KEY`、`ARK_BASE_URL`、`MODEL_CHAT`、`MODEL_EMBEDDING`、`DATABASE_URL`、`REDIS_URL`。
+- 全部配置经 `pydantic-settings` 从环境变量 / `.env` 读取（`yk_agent/config.py`），**统一 `YK_` 前缀**（与机器上的全局环境变量隔离），包括：`YK_ARK_API_KEY`、`YK_ARK_BASE_URL`、`YK_MODEL_CHAT`、`YK_MODEL_EMBEDDING`、`YK_DATABASE_URL`、`YK_REDIS_URL`。
 - `.env` 不入库（已在 .gitignore）；提供 `.env.example` 模板。

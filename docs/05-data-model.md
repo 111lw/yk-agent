@@ -27,7 +27,7 @@ kb_chunks           知识库切片（pgvector）
 ### user_preferences（L2 偏好，更新最频繁的表）
 - 唯一约束 `(user_id, dimension, value)` —— 抽取器合并按此 upsert。
 - `weight numeric(3,2)`、`sentiment`、`source`、`expires_at timestamptz`（时点性偏好）。
-- `value_embedding vector(1024)`：value 规范化后同文本的 embedding，用于"用户提过类似偏好"的语义召回。维度以 `MODEL_EMBEDDING` 实际输出为准，**改动需同步 init_db.sql 与 config**。
+- `value_embedding vector(1024)`：value 规范化后同文本的 embedding，用于"用户提过类似偏好"的语义召回。维度以 `YK_MODEL_EMBEDDING` 实际输出为准，**改动需同步 init_db.sql 与 config**。
 
 ### trips（攻略）
 - `plan jsonb`：完整行程结构（逐日 → 时段 → POI 引用 + 说明）。

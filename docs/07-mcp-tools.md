@@ -44,7 +44,7 @@ mcp/
 
 ## 鉴权与配置
 
-- 第三方 API key 全部走环境变量（`AMAP_API_KEY` / `BAIDU_MAP_API_KEY` …），见 02 文档配置管理。
+- 第三方 API key 全部走环境变量（`YK_AMAP_API_KEY` / `YK_BAIDU_MAP_API_KEY` …，统一 YK_ 前缀），见 02 文档配置管理。
 - API key 出现在日志/trace 中必须脱敏。
 
 ## 新增工具流程

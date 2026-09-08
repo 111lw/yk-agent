@@ -83,7 +83,7 @@ class PlanTask(BaseModel):
 | 规则 | 值 | 触发后行为 |
 |---|---|---|
 | 最大步数 | `steps_done <= 15` | 强制收敛：基于现有 findings 生成回答 |
-| 单次编排 token 预算 | 配置项 `MAX_TOKENS_BUDGET` | 同上 |
+| 单次编排 token 预算 | 配置项 `YK_MAX_TOKENS_BUDGET` | 同上 |
 | Critic 回炉次数 | ≤ 2 | 超限输出并附加"以下方面可能有瑕疵"说明 |
 | 副作用动作 | `side_effect=True` 的任务 | **中断，SSE 发 `confirmation_request` 事件，等用户确认后才派发** |
 | 领域边界 | 非旅游意图 | 礼貌拒答，不派发任何子智能体 |

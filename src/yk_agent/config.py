@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        # 统一前缀：与机器全局环境变量隔离（全局 ARK_API_KEY 曾覆盖 .env，排查良久）
+        env_prefix="YK_",
         extra="ignore",  # .env 里多余的字段不报错，方便渐进加配置
     )
 
