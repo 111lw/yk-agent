@@ -73,7 +73,7 @@
 profile/
 ├── models.py        # 画像相关 pydantic model（UserProfile/Preference/...）
 ├── extractor.py     # 偏好抽取器（LLM 调用，json_mode）
-├── merger.py        # 增量合并规则（幂等/矛盾/衰减）
+├── merger.py        # 增量合并规则（幂等/矛盾/截断；时间衰减属 V2）
 ├── summarizer.py    # 画像摘要生成（注入 prompt 用，控制 token 预算）
-└── repository.py    # 画像读写（PG），对上层只暴露接口
+└── repository.py    # 画像读写：接口 + InMemory 实现（PG 实现随存储接线步骤落地）
 ```

@@ -42,3 +42,7 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI 的 Depends() 默认参数是官方惯用法，B008 误报
+"src/yk_agent/api/routes/*" = ["B008"]
