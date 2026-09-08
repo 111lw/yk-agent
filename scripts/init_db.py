@@ -13,12 +13,27 @@ from yk_agent.config import settings
 from yk_agent.storage.sqlite import SqliteStore, sqlite_path_from_url
 
 
+def _force_utf8_stdout() -> None:
+    """Windows 终端默认用 GBK(cp936) 编码 stdout，打印 ✅/中文会抛 UnicodeEncodeError。
+
+    与其迁就终端删掉可读字符，不如显式把输出切回 UTF-8（Windows Terminal + TrueType
+    字体可正常显示）。若终端实在不认 UTF-8，reconfigure 会失败——静默跳过，不崩脚本。
+    """
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError):  # 非流对象 / 无 reconfigure（极老 Python）
+        pass
+
+
+_force_utf8_stdout()
+
+
 async def main() -> int:
     path = sqlite_path_from_url(settings.database_url)
     store = SqliteStore(path)
     await store.connect()
-    # 输出避免 emoji：Windows 终端默认 GBK 无法编码，会导致 UnicodeEncodeError
-    print(f"[ok] SQLite ready: {path.resolve()}")
+    print(f"✅ SQLite 就绪: {path.resolve()}")
     await store.close()
     return 0
 
