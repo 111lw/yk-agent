@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 语言 | Python 3.12+，环境管理用 **conda**（见 `environment.yml`），依赖安装用 pip |
 | 智能体框架 | LangGraph（决策记录见 `docs/decisions/ADR-001-langgraph.md`） |
 | API | FastAPI + SSE 流式输出 |
-| 存储 | PostgreSQL + pgvector（主存储）、Redis（会话缓存） |
+| 存储 | **SQLite**（全环境，aiosqlite + WAL，决策见 `docs/decisions/ADR-002-sqlite.md`） |
 | 模型接入 | 自研 provider 抽象层（`src/yk_agent/llm/`），默认火山方舟(豆包)，可切换 OpenAI/Claude；**业务代码禁止直接 import 任何厂商 SDK** |
 
 ## 常用命令
@@ -37,7 +37,7 @@ ruff check . && ruff format .                      # lint + format
 |---|---|
 | 改编排逻辑（Orchestrator/Planner/子智能体派发） | `docs/03-agent-orchestration.md` ⭐ 全项目最重要文档 |
 | 改画像/记忆相关 | `docs/04-user-profile.md` |
-| 改表结构 / 写迁移 | `docs/05-data-model.md` + `scripts/init_db.sql` |
+| 改表结构 / 写迁移 | `docs/05-data-model.md` + `src/yk_agent/storage/sqlite.py`（schema 事实来源） |
 | 新增/修改 Skill | `docs/06-skills-spec.md` |
 | 新增/修改 MCP 工具 | `docs/07-mcp-tools.md` |
 | 改 API 接口 | `docs/08-api-spec.md` |
@@ -58,4 +58,4 @@ ruff check . && ruff format .                      # lint + format
 
 - 改了编排规则 → 同步 `docs/03-agent-orchestration.md`
 - 改了架构/选型 → 新增 ADR 到 `docs/decisions/`
-- 接口/表结构变更 → 同步 08 / 05 文档及 `scripts/init_db.sql`
+- 接口/表结构变更 → 同步 08 / 05 文档及 `src/yk_agent/storage/sqlite.py`

@@ -11,7 +11,7 @@
 3. 子智能体 ×3：poi-agent / route-agent / budget-agent（经 Registry 注册）
 4. 画像：冷启动问卷 skill + 偏好抽取回写 + 画像摘要注入 + L3 反馈回写
 5. 工具：map-mcp（geocode/poi_search/route_plan）+ kb_search（最小知识库：精选 20~50 篇目的地内容）
-6. 存储：PG 全部表 + pgvector + Redis 会话
+6. 存储：SQLite 全量持久化（画像/会话/攻略/trace，ADR-002）
 7. API：`POST /api/chat`（SSE 全事件协议）+ trips/feedback/profile 接口
 
 **验收标准**（对应 01 文档成功指标）：

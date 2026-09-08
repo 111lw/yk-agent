@@ -1,6 +1,8 @@
 # 05 数据模型
 
-> 建表 DDL 的唯一事实来源是 `scripts/init_db.sql`（本篇讲设计意图，DDL 有变更必须同步该文件并更新本篇）。
+> 存储选型：**全环境 SQLite**（决策见 `docs/decisions/ADR-002-sqlite.md`）。
+> schema 唯一事实来源是 `src/yk_agent/storage/sqlite.py` 的 `_SCHEMA`（本篇讲设计意图，DDL 有变更必须同步该文件并更新本篇）。
+> 初始化：`python scripts/init_db.py`（幂等建库建表）。
 
 ## 库表总览
 
@@ -8,51 +10,46 @@
 users               用户
 user_profiles       L1 静态人格（1:1 users）
 user_preferences    L2 动态偏好（1:N）
-feedback_events     L3 行为反馈（1:N）
+feedback_events     L3 行为反馈
 chat_sessions       会话
 chat_messages       消息
 trips               生成的攻略
 agent_traces        编排 trace（可观测性）
-kb_documents        知识库文档
-kb_chunks           知识库切片（pgvector）
 ```
+
+> 知识库表（kb_documents / kb_chunks）随 RAG 阶段实现时加入，向量以 JSON 存取 + 内存余弦计算（ADR-002）。
 
 ## 关键设计
 
 ### users / user_profiles
-- `users`: 业务侧唯一标识（MVP 用匿名 id + 昵称即可，不接手机号注册）。
-- `user_profiles.persona_types`: `text[]`，最多 2 个旅行人格枚举值（见 04 文档）。
-- `user_profiles.traits`: jsonb，Big Five 简化分值（0~1），允许缺省。
+- `users.id`: TEXT 主键——MVP 匿名体系直接使用外部 `X-User-Id` 标识，不接注册。
+- `user_profiles.persona_types`: JSON 数组，最多 2 个旅行人格枚举值（见 04 文档）。
+- `user_profiles.traits`: JSON，Big Five 简化分值（0~1），允许缺省。
 
 ### user_preferences（L2 偏好，更新最频繁的表）
 - 唯一约束 `(user_id, dimension, value)` —— 抽取器合并按此 upsert。
-- `weight numeric(3,2)`、`sentiment`、`source`、`expires_at timestamptz`（时点性偏好）。
-- `value_embedding vector(1024)`：value 规范化后同文本的 embedding，用于"用户提过类似偏好"的语义召回。维度以 `YK_MODEL_EMBEDDING` 实际输出为准，**改动需同步 init_db.sql 与 config**。
+- `weight REAL`、`sentiment`、`source`、`expires_at`（时点性偏好）。
+- `value_embedding`：V2 引入（向量以 JSON 存取 + 内存余弦召回，见 ADR-002）。
 
 ### trips（攻略）
-- `plan jsonb`：完整行程结构（逐日 → 时段 → POI 引用 + 说明）。
-- `budget jsonb`：分项预算。
-- `profile_snapshot jsonb`：**生成时所用画像快照**——画像会变，攻略的可解释性绑定生成时点。
+- `findings`：JSON，各子智能体产出快照（poi/route/budget 的完整结构化输出）。
+- `profile_snapshot`：**生成时所用画像快照**——画像会变，攻略的可解释性绑定生成时点。
 - `status`: draft / accepted / modified / rejected。
 
 ### agent_traces（编排 trace，调试自主编排的唯一依据）
-- `plan_snapshot jsonb`、`dispatches jsonb[]`（每次派发：agent/输入摘要/token/耗时）、`critic_verdict jsonb`、`total_tokens int`。
-- 只增不改；MVP 不做聚合分析，能按 session_id 查即可。
+- `plan_snapshot`、`dispatches`（每次派发：agent/status/ms）、`critic_verdict`、`total_tokens`。
+- 只增不改；由 chat 路由在编排结束后写入（`api/routes/chat.py`）。
 
-### kb_documents / kb_chunks（RAG）
-- `kb_documents`: 目的地/主题/来源/清洗状态。
-- `kb_chunks`: 切片文本 + `embedding vector(1024)` + 元数据（city、category、tags text[]）。检索过滤主要走 `city + category`，向量召回 + 标签加权（见 04 文档双通道）。
-- 建索引：`CREATE INDEX ... USING hnsw (embedding vector_cosine_ops)`。
+### feedback_events（L3 反馈）
+- trips 反馈时同步落一条；画像 weight 回写逻辑属 V2（docs/04 §反馈回写）。
 
-## Redis 键约定
+## 会话缓存
 
-| key | 内容 | TTL |
-|---|---|---|
-| `session:{session_id}:messages` | 会话消息环形缓冲（list，≤50 条） | 7d |
-| `session:{session_id}:state` | 进行中编排的状态快照（checkpoint 兜底在 PG） | 1h |
-| `ratelimit:{user_id}` | 简单限流计数 | 1min |
+- 热数据在进程内存（`AppState.sessions`）；消息与攻略持久化在 SQLite，重启不丢。
+- MVP 单实例部署，无分布式缓存需求（ADR-002）。
 
 ## 迁移策略
 
-- MVP：`scripts/init_db.py` 幂等执行 `scripts/init_db.sql`（IF NOT EXISTS）。
-- 引入 Alembic 的时机：出现第一个"改已有表"的需求时（记入 roadmap V2）。
+- schema 变更 = 修改 `storage/sqlite.py` 的 `_SCHEMA`（CREATE TABLE IF NOT EXISTS，幂等）。
+- 破坏性变更（改列类型/删列）出现时：引入备份-重建脚本或迁移表版本号（`PRAGMA user_version`），届时登记 roadmap。
+- 未来若需水平扩展再迁 PG：repository 协议已隔离，迁移面 = storage 层一个包（ADR-002）。

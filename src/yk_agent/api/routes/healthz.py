@@ -10,7 +10,7 @@ router = APIRouter()
 
 @router.get("/healthz")
 async def healthz(state: AppState = Depends(get_state)) -> dict:
-    """MVP 仅检查 LLM provider 工厂可用性；DB/Redis 接通后扩展。"""
+    """MVP 检查 LLM provider 配置可用性 + 存储计数。"""
     try:
         from yk_agent.llm.factory import ProviderNotConfigured, get_provider
 
@@ -21,9 +21,5 @@ async def healthz(state: AppState = Depends(get_state)) -> dict:
             llm_ok = False
     except Exception:  # noqa: BLE001
         llm_ok = False
-    return {
-        "status": "ok",
-        "llm": llm_ok,
-        "sessions": len(state.sessions),
-        "trips": len(state.trips),
-    }
+    counts = await state.counts()
+    return {"status": "ok", "llm": llm_ok, **counts}

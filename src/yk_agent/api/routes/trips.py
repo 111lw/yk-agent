@@ -35,25 +35,17 @@ def _summary(record) -> dict:
 async def list_trips(
     state: AppState = Depends(get_state), x_user_id: str = Header(...)
 ) -> list[dict]:
-    return [_summary(r) for r in state.trips.values() if r.user_id == x_user_id]
+    return await state.list_trips(x_user_id)
 
 
 @router.get("/{trip_id}")
 async def get_trip(
     trip_id: str, state: AppState = Depends(get_state), x_user_id: str = Header(...)
 ):
-    record = state.trips.get(trip_id)
-    if record is None or record.user_id != x_user_id:
+    record = await state.get_trip(trip_id, x_user_id)
+    if record is None:
         raise HTTPException(status_code=404, detail="trip not found")
-    return {
-        "trip_id": record.trip_id,
-        "session_id": record.session_id,
-        "status": record.status,
-        "final_answer": record.final_answer,
-        "findings": record.findings,
-        "profile_snapshot": record.profile_snapshot,
-        "feedback": record.feedback,
-    }
+    return record
 
 
 @router.post("/{trip_id}/feedback")
@@ -63,9 +55,10 @@ async def post_feedback(
     state: AppState = Depends(get_state),
     x_user_id: str = Header(...),
 ) -> dict:
-    record = state.trips.get(trip_id)
-    if record is None or record.user_id != x_user_id:
+    status = {"accept": "accepted", "modify": "modified", "reject": "rejected"}[req.action]
+    ok = await state.update_trip_status(
+        trip_id, x_user_id, status, {"action": req.action, "detail": req.detail}
+    )
+    if not ok:
         raise HTTPException(status_code=404, detail="trip not found")
-    record.status = {"accept": "accepted", "modify": "modified", "reject": "rejected"}[req.action]
-    record.feedback.append({"action": req.action, "detail": req.detail})
-    return {"trip_id": record.trip_id, "status": record.status}
+    return {"trip_id": trip_id, "status": status}

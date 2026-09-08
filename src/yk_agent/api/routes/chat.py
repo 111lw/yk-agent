@@ -9,6 +9,7 @@ MVP 简化（已登记 V2 清理）：
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -44,7 +45,7 @@ async def chat(
     agent_nodes = {s.graph_node for s in state.registry.specs()}
 
     async def event_stream() -> AsyncIterator[dict[str, str]]:
-        sess = state.get_or_create_session(user_id, req.session_id)
+        sess = await state.get_or_create_session(user_id, req.session_id)
         yield SSEEvent(
             event="session", data={"session_id": sess.session_id, "user_id": user_id}
         ).encode()
@@ -60,6 +61,12 @@ async def chat(
         try:
             final_answer: str | None = None
             findings: dict[str, Any] = {}
+            # —— trace 采集（docs/03 §可观测性）——
+            agent_started_at: dict[str, float] = {}
+            dispatches: list[dict[str, Any]] = []
+            plan_snapshot: list = []
+            critic_verdict: dict | None = None
+            total_tokens = 0
 
             async for ev in state.graph.astream_events(graph_state, version="v2"):
                 kind = ev.get("event")
@@ -67,28 +74,56 @@ async def chat(
                 out = (ev.get("data") or {}).get("output")
                 if kind == "on_chain_stream" and node in agent_nodes:
                     # Send 派发的子智能体不发 on_chain_start，用 on_chain_stream 作为开始信号
+                    agent_started_at[node] = time.monotonic()
                     yield SSEEvent(event="agent_start", data={"agent": node}).encode()
                     continue
                 if not isinstance(out, dict):
                     # 路由函数（返回 Send 列表/字符串）等事件的 output 非 dict
                     continue
+                if isinstance(out.get("tokens_used"), int):
+                    total_tokens += out["tokens_used"]
                 if kind == "on_chain_end" and node in agent_nodes:
                     if out.get("findings"):
                         findings.update(out["findings"])
+                    dispatches.append(
+                        {
+                            "agent": node,
+                            "status": "ok",
+                            "ms": int(
+                                (time.monotonic() - agent_started_at.get(node, time.monotonic()))
+                                * 1000
+                            ),
+                        }
+                    )
                     yield SSEEvent(event="agent_end", data={"agent": node, "status": "ok"}).encode()
                 elif kind == "on_chain_end" and node == "orchestrator":
                     if out.get("plan"):
+                        plan_snapshot = out["plan"]
                         yield SSEEvent(event="plan_update", data={"tasks": out["plan"]}).encode()
+                elif kind == "on_chain_end" and node == "critic":
+                    verdict = out.get("critic_verdict")
+                    if verdict is not None:
+                        critic_verdict = (
+                            verdict if isinstance(verdict, dict) else verdict.model_dump()
+                        )
                 elif kind == "on_chain_end" and node == "responder":
                     final_answer = out.get("final_answer")
                     if final_answer:
                         yield SSEEvent(event="token", data={"text": final_answer}).encode()
 
-            # —— 回写：攻略存档 + 偏好抽取 ——
+            # —— 回写：trace / 攻略存档 / 偏好抽取 ——
+            await state.write_trace(
+                session_id=sess.session_id,
+                user_id=user_id,
+                plan_snapshot=plan_snapshot,
+                dispatches=dispatches,
+                critic_verdict=critic_verdict,
+                total_tokens=total_tokens,
+            )
             trip_id = None
             if final_answer and findings:
                 trip_id = uuid.uuid4().hex
-                state.save_trip(
+                await state.save_trip(
                     TripRecord(
                         trip_id=trip_id,
                         user_id=user_id,
@@ -120,6 +155,9 @@ async def chat(
 
             sess.history.append({"role": "user", "content": req.message})
             sess.history.append({"role": "assistant", "content": final_answer or ""})
+            if state.store is not None:
+                await state.store.append_message(sess.session_id, "user", req.message)
+                await state.store.append_message(sess.session_id, "assistant", final_answer or "")
 
             yield SSEEvent(event="done", data={"trip_id": trip_id}).encode()
         except Exception as e:  # noqa: BLE001 — SSE 内错误必须以 error 事件收敛

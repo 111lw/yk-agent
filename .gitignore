@@ -24,3 +24,6 @@ logs/
 
 # conda 建环境临时产物
 condaenv.*.requirements.txt
+
+# SQLite 数据文件
+data/

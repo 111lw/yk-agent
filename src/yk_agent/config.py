@@ -18,9 +18,8 @@ class Settings(BaseSettings):
         extra="ignore",  # .env 里多余的字段不报错，方便渐进加配置
     )
 
-    # —— 存储 ——
-    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/yk_agent"
-    redis_url: str = "redis://localhost:6379/0"
+    # —— 存储（全环境 SQLite，见 docs/decisions/ADR-002-sqlite.md）——
+    database_url: str = "sqlite:///data/yk_agent.db"
 
     # —— 模型（火山方舟，OpenAI 协议兼容）——
     ark_api_key: str = ""  # 留空表示未配置，get_provider() 会给出明确报错

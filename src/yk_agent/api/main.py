@@ -14,8 +14,11 @@ from yk_agent.api.state import build_default_state
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    app.state.app_state = build_default_state()
+    state = await build_default_state()
+    app.state.app_state = state
     yield
+    if state.store is not None:
+        await state.store.close()
 
 
 app = FastAPI(title="yk-agent", version="0.1.0", lifespan=lifespan)

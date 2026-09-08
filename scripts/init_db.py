@@ -1,28 +1,25 @@
-"""初始化数据库：幂等执行 init_db.sql（DDL 事实来源，设计说明见 docs/05-data-model.md）。
+"""初始化数据库（SQLite）：建库文件并执行内建 schema（幂等）。
+
+schema 唯一事实来源：src/yk_agent/storage/sqlite.py（PG 版 DDL 已随全环境 SQLite
+决策移除，见 docs/decisions/ADR-002-sqlite.md）。
 
 用法：conda activate yk-agent && python scripts/init_db.py
-依赖：DATABASE_URL 环境变量（见 .env.example）。
 """
 
 import asyncio
 import sys
-from pathlib import Path
 
-SQL_PATH = Path(__file__).parent / "init_db.sql"
+from yk_agent.config import settings
+from yk_agent.storage.sqlite import SqliteStore, sqlite_path_from_url
 
 
 async def main() -> int:
-    import psycopg
-
-    from yk_agent.config import settings
-
-    print(f"连接数据库并执行 {SQL_PATH.name} ...")
-    # MVP 用同步连接分语句执行即可；语句以分号切分依赖 SQL 文件内不含过程块
-    conninfo = settings.database_url
-    with psycopg.connect(conninfo) as conn:
-        conn.execute(SQL_PATH.read_text(encoding="utf-8"))
-        conn.commit()
-    print("✅ 数据库初始化完成")
+    path = sqlite_path_from_url(settings.database_url)
+    store = SqliteStore(path)
+    await store.connect()
+    # 输出避免 emoji：Windows 终端默认 GBK 无法编码，会导致 UnicodeEncodeError
+    print(f"[ok] SQLite ready: {path.resolve()}")
+    await store.close()
     return 0
 
 

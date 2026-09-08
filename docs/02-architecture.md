@@ -57,8 +57,8 @@
 | 语言 | Python 3.12 | 智能体/数据生态最全，瓶颈在 LLM 延迟不在语言 | ADR-001 |
 | 编排框架 | LangGraph | Send API 支持运行时动态并行派发；checkpoint 支持持久化与 human-in-the-loop | ADR-001 |
 | API | FastAPI + sse-starlette | 异步原生、SSE 一等支持 | — |
-| 主存储 | PostgreSQL + pgvector | 画像(结构化)+知识库(向量)一库搞定，MVP 规模足够 | `05-data-model.md` |
-| 缓存 | Redis | 会话热数据、限流 | `05-data-model.md` |
+| 主存储 | **SQLite**（aiosqlite + WAL） | 全环境统一：零运维、单机部署、文件即备份 | `05-data-model.md`、ADR-002 |
+| 缓存 | 进程内存 | 会话热数据；SQLite 落库兜底 | `05-data-model.md` |
 | LLM | 火山方舟(豆包)默认 | 国内可用、OpenAI 协议兼容 | 本文档 §模型接入 |
 
 ## 模型接入层（llm/）
@@ -85,5 +85,5 @@ class LLMProvider(Protocol):
 
 ## 配置管理
 
-- 全部配置经 `pydantic-settings` 从环境变量 / `.env` 读取（`yk_agent/config.py`），**统一 `YK_` 前缀**（与机器上的全局环境变量隔离），包括：`YK_ARK_API_KEY`、`YK_ARK_BASE_URL`、`YK_MODEL_CHAT`、`YK_MODEL_EMBEDDING`、`YK_DATABASE_URL`、`YK_REDIS_URL`。
+- 全部配置经 `pydantic-settings` 从环境变量 / `.env` 读取（`yk_agent/config.py`），**统一 `YK_` 前缀**（与机器上的全局环境变量隔离），包括：`YK_ARK_API_KEY`、`YK_ARK_BASE_URL`、`YK_MODEL_CHAT`、`YK_MODEL_EMBEDDING`、`YK_DATABASE_URL`（SQLite，形如 `sqlite:///data/yk_agent.db`）。
 - `.env` 不入库（已在 .gitignore）；提供 `.env.example` 模板。

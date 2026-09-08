@@ -12,10 +12,8 @@ dependencies = [
     "pydantic>=2.8",
     "pydantic-settings>=2.4",
     "httpx>=0.27",
-    "psycopg[binary,pool]>=3.2",
-    "pgvector>=0.3",
-    "redis>=5.0",
-    "openai>=1.40",        # 火山方舟兼容 OpenAI 协议，仅允许在 llm/ 抽象层内使用
+    "aiosqlite>=0.20",
+    "openai>=1.40",        # 模型协议 SDK（当前商汤/方舟），仅允许在 llm/ 抽象层内使用
 ]
 
 [project.optional-dependencies]
