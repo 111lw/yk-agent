@@ -52,9 +52,10 @@ class OpenAICompatibleProvider(LLMProvider):
         api_key: str,
         default_chat_model: str,
         default_embed_model: str,
+        timeout: float = 90.0,  # 单次调用超时（秒）——编排失败要快速降级，不能挂死
         client: AsyncOpenAI | None = None,  # 测试注入 mock 用
     ) -> None:
-        self._client = client or AsyncOpenAI(base_url=base_url, api_key=api_key)
+        self._client = client or AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
         self._default_chat_model = default_chat_model
         self._default_embed_model = default_embed_model
 
