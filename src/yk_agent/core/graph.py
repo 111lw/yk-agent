@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -46,7 +47,9 @@ _ORCH_SYSTEM = """你是旅游智能体的编排者。根据用户请求与可�
 4. 与旅游无关的请求，plan 返回空数组。
 只输出 JSON。"""
 
-_ORCH_USER = "用户请求：{message}"
+_ORCH_USER = (
+    "用户画像摘要（规划须与其一致，dislike 项不得安排）：\n{profile}\n\n用户请求：{message}"
+)
 
 _ORCH_REVISE_USER = """上一轮产出未通过评审，问题：
 {reasons}
@@ -72,9 +75,10 @@ class _PlanOutput(BaseModel):
     plan: list[PlanTask] = Field(default_factory=list)
 
 
-def build_graph(registry: AgentRegistry, provider: LLMProvider):
+def build_graph(registry: AgentRegistry, provider: LLMProvider, skills: Sequence[str] = ()):
     """以 Registry 为节点来源编译编排 graph。
 
+    skills：装载的 SKILL.md 正文（docs/06-skills-spec.md），注入 responder 的 system prompt。
     checkpoint 传入方（api 层第 4 步接 Postgres saver）用于 human-in-the-loop 恢复。
     """
 
@@ -117,7 +121,13 @@ def build_graph(registry: AgentRegistry, provider: LLMProvider):
             ChatMessage(
                 role="system", content=_ORCH_SYSTEM.format(catalog=registry.catalog_for_llm())
             ),
-            ChatMessage(role="user", content=_ORCH_USER.format(message=state["user_message"])),
+            ChatMessage(
+                role="user",
+                content=_ORCH_USER.format(
+                    profile=json.dumps(state.get("user_profile", {}), ensure_ascii=False),
+                    message=state["user_message"],
+                ),
+            ),
         ]
         result, llm_resp = await chat_validated_detailed(provider, messages, _PlanOutput)
         return {
@@ -205,6 +215,9 @@ def build_graph(registry: AgentRegistry, provider: LLMProvider):
     # ---------- Responder ----------
 
     async def responder_node(state: TripState) -> dict[str, Any]:
+        system = _RESPONDER_SYSTEM
+        if skills:
+            system = system + "\n\n" + "\n\n---\n\n".join(skills)
         findings = state.get("findings", {})
         verdict = state.get("critic_verdict")
         prefix = ""
