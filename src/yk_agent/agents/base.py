@@ -31,3 +31,18 @@ def parse_slot(instruction: str, key: str, *, stop_at_comma: bool = True) -> str
     value_pattern = r"[^\s；;，,]+" if stop_at_comma else r".+?(?=\s|$)"
     m = re.search(rf"{key}\s*[:：=]\s*({value_pattern})", instruction)
     return m.group(1).strip() if m else None
+
+
+def parse_int_slot(instruction: str, key: str, default: int) -> int:
+    """提取 "key=值" 中的整数，取不到数字时返回 default。
+
+    真实 LLM 常写出 "天数=2天" / "天数：两到三天" 这类带单位或文字的值，
+    直接 int() 会崩（曾致 route-agent 在真实链路失败）；只提取数字部分。
+    """
+    import re
+
+    value = parse_slot(instruction, key)
+    if value is None:
+        return default
+    m = re.search(r"\d+", value)
+    return int(m.group()) if m else default

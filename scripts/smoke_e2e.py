@@ -1,4 +1,4 @@
-"""真实端到端冒烟：真实 LLM(商汤) + 真实地图(高德) + SQLite，直跑编排 graph。
+"""真实端到端冒烟：真实 LLM + 真实地图(高德) + SQLite，直跑编排 graph。
 
 用法：conda activate yk-agent && python scripts/smoke_e2e.py "想去大理玩2天"
 不走 HTTP，直接以 TripState 驱动 graph.astream，逐节点打印，便于定位阻塞点。
@@ -10,6 +10,18 @@ import asyncio
 import json
 import sys
 import traceback
+
+
+def _force_utf8_stdout() -> None:
+    """Windows 终端默认 GBK 编码 stdout，打印 ✅/中文会抛 UnicodeEncodeError（同 init_db.py）。"""
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError):
+        pass
+
+
+_force_utf8_stdout()
 
 
 async def main(message: str) -> int:

@@ -10,7 +10,7 @@ import logging
 
 from pydantic import BaseModel, Field
 
-from yk_agent.agents.base import AgentPayload, parse_slot
+from yk_agent.agents.base import AgentPayload, parse_int_slot
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class RouteAgentOutput(BaseModel):
 def make_route_agent():
     async def run(payload: dict) -> dict:
         req = RouteAgentInput.model_validate(payload)
-        days_n = int(parse_slot(req.instruction, "天数") or 3)
+        days_n = parse_int_slot(req.instruction, "天数", 3)
 
         poi_finding = (req.upstream.get("poi-agent") or {}).get("data") or {}
         candidate_pois = poi_finding.get("pois", [])

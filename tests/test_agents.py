@@ -60,6 +60,26 @@ async def test_poi_agent_requires_city_slot():
 # ---------- route/budget 单测 ----------
 
 
+def test_parse_int_slot_tolerates_units_and_words():
+    """真实 LLM 会写 "天数=2天"/"天数：两到三天" 这类值——只取数字，崩不了（真实链路曾踩坑）。"""
+    from yk_agent.agents.base import parse_int_slot
+
+    assert parse_int_slot("天数=2天 安排行程", "天数", 3) == 2
+    assert parse_int_slot("天数：5", "天数", 3) == 5
+    assert parse_int_slot("帮我安排行程", "天数", 3) == 3  # 片段缺失 → default
+    assert parse_int_slot("天数=两天", "天数", 3) == 3  # 无数字 → default
+
+
+async def test_route_agent_parses_days_with_unit_suffix():
+    """回归：instruction 带 "天数=2天" 时 route-agent 不再抛 int() 异常。"""
+    run = make_route_agent()
+    poi = make_poi_agent(MockMapProvider())
+    poi_out = await poi(_payload("城市=大理 关键词=景点"))
+    upstream = {"poi-agent": {"ok": True, "data": poi_out}}
+    out = await run(_payload("天数=2天 串联POI为行程", upstream=upstream))
+    assert len(out["days"]) == 2
+
+
 async def test_route_agent_requires_upstream():
     run = make_route_agent()
     with pytest.raises(ValueError, match="poi-agent"):
