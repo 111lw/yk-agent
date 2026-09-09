@@ -110,7 +110,7 @@ START → orchestrator ──(plan 有待派发且无依赖)──→ Send×N �
 
 | name | 职责 | 依赖工具 | side_effect |
 |---|---|---|---|
-| `poi-agent` | 按城市+偏好检索景点/餐厅/酒店候选，画像 dislike 硬过滤 | map-mcp(poi_search) | false |
+| `poi-agent` | 按城市+偏好检索景点/餐厅候选；非游玩类（住宿/住宅/交通等）与画像 dislike 双重硬过滤 | map-mcp(poi_search) | false |
 | `route-agent` | 把 POI 串联成逐日行程（地理/时间合理性） | 上游 poi-agent 产出；route_plan 精算属 V2 | false |
 | `budget-agent` | 行程预算测算（交通/住宿/门票/餐饮分项） | 上游 route-agent 产出 + 估算系数；knowledge 接入属 V2 | false |
 

@@ -1,7 +1,10 @@
-"""poi-agent：按城市+偏好检索景点/餐饮/住宿 POI 候选。
+"""poi-agent：按城市+偏好检索景点/餐饮 POI 候选。
 
-画像联动（docs/04-user-profile.md §双通道）：dislike 项对 POI 名称/分类做
-硬过滤（关键词映射表），like 项仅作排序加权，绝不武断丢弃。
+两级硬过滤（docs/04-user-profile.md §双通道）：
+1. 类别过滤：高德返回的住宿/住宅/交通等非游玩类不进行程（真实链路 Critic 曾发现
+   客栈被当作景点排入活动，e2e 实测教训）；
+2. 画像 dislike：dislike 项对 POI 名称/分类做硬过滤（关键词映射表）。
+like 项仅作排序加权，绝不武断丢弃。
 """
 
 from __future__ import annotations
@@ -27,6 +30,26 @@ DISLIKE_KEYWORDS: dict[str, tuple[str, ...]] = {
     "temple": ("寺", "庙"),
 }
 
+# 高德顶级类别中不可作为行程活动的类型（ category 取 type 第一段，见 amap.py）。
+# 购物/餐饮保留：商业街可逛、餐馆是要排的用餐活动。
+NON_VISIT_CATEGORIES: frozenset[str] = frozenset(
+    {
+        "住宿服务",
+        "商务住宅",
+        "交通设施服务",
+        "汽车服务",
+        "汽车销售",
+        "汽车维修",
+        "公司企业",
+        "医疗保健",
+        "政府机构及社会团体",
+        "金融保险服务",
+        "生活服务",
+        "地名地址信息",
+        "道路附属设施",
+    }
+)
+
 
 class PoiAgentInput(AgentPayload):
     pass  # 城市/关键词从 instruction 的 "城市=xx 关键词=xx" 片段解析
@@ -35,8 +58,9 @@ class PoiAgentInput(AgentPayload):
 class PoiAgentOutput(BaseModel):
     city: str
     keywords: list[str]
-    pois: list[Poi] = Field(default_factory=list)  # 已过画像 dislike 硬过滤
-    filtered_count: int = 0  # 被画像过滤掉的数量（可解释性用）
+    pois: list[Poi] = Field(default_factory=list)  # 已过类别 + 画像 dislike 硬过滤
+    filtered_count: int = 0  # 被过滤掉的总数 = 非游玩类 + 画像 dislike（可解释性用）
+    non_visit_filtered: int = 0  # 其中因非游玩类别被过滤的数量
     kb_tips: list[str] = Field(default_factory=list)  # 知识库召回的目的地攻略要点
     note: str = ""
 
@@ -85,18 +109,26 @@ def make_poi_agent(map_provider: MapProvider, kb: KbRetriever | None = None):
             else:
                 failed.append(kw)
 
-        # 按 poi_id 去重后过画像硬过滤
+        # 按 poi_id 去重 → 非游玩类过滤 → 画像 dislike 硬过滤
         seen: set[str] = set()
         unique: list[Poi] = []
         for p in all_pois:
             if p.poi_id not in seen:
                 seen.add(p.poi_id)
                 unique.append(p)
-        kept = [p for p in unique if not _matches_dislike(p, dislikes)]
+        visit_worthy = [p for p in unique if p.category not in NON_VISIT_CATEGORIES]
+        kept = [p for p in visit_worthy if not _matches_dislike(p, dislikes)]
+        non_visit_count = len(unique) - len(visit_worthy)
 
         note = ""
         if failed:
             note = f"关键词 {failed} 检索失败（降级：缺失该类候选）"
+        if non_visit_count:
+            note = (
+                f"{note}；已剔除 {non_visit_count} 个非游玩类候选（住宿/住宅/交通等）"
+                if note
+                else (f"已剔除 {non_visit_count} 个非游玩类候选（住宿/住宅/交通等）")
+            )
 
         # 知识库补充目的地攻略要点（失败静默跳过，不影响 POI 主产出）
         kb_tips: list[str] = []
@@ -112,6 +144,7 @@ def make_poi_agent(map_provider: MapProvider, kb: KbRetriever | None = None):
             keywords=keywords,
             pois=kept,
             filtered_count=len(unique) - len(kept),
+            non_visit_filtered=non_visit_count,
             kb_tips=kb_tips,
             note=note,
         ).model_dump()

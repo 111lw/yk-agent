@@ -57,6 +57,40 @@ async def test_poi_agent_requires_city_slot():
         await run(_payload("帮我找点好玩的"))
 
 
+class _MixedCategoryMap:
+    """模拟高德混合类别返回：游玩类与住宿/住宅混在一起（真实接口即如此）。"""
+
+    async def poi_search(self, req):
+        from yk_agent.mcp.contracts.map import PoiSearchResponse
+
+        rows = [
+            ("p1", "洱海公园", "风景名胜"),
+            ("p2", "洗山隐舍客栈", "住宿服务"),
+            ("p3", "某某小区", "商务住宅"),
+            ("p4", "白族私房菜", "餐饮服务"),
+        ]
+        return PoiSearchResponse.model_validate(
+            {
+                "pois": [
+                    {"poi_id": pid, "name": name, "category": cat, "location": "100.1,25.6"}
+                    for pid, name, cat in rows
+                ],
+                "total": len(rows),
+            }
+        )
+
+
+async def test_poi_agent_filters_non_visit_categories():
+    """回归（e2e 教训）：客栈/住宅曾被排入行程——非游玩类必须在 poi-agent 挡下。"""
+    run = make_poi_agent(_MixedCategoryMap())
+    out = await run(_payload("城市=大理 关键词=景点"))
+    cats = {p["category"] for p in out["pois"]}
+    assert cats == {"风景名胜", "餐饮服务"}
+    assert out["non_visit_filtered"] == 2
+    assert out["filtered_count"] == 2
+    assert "非游玩类" in out["note"]
+
+
 # ---------- route/budget 单测 ----------
 
 
