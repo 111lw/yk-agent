@@ -27,3 +27,6 @@ condaenv.*.requirements.txt
 
 # SQLite 鏁版嵁鏂囦欢
 data/
+
+# 会话交接记录
+handoff.md

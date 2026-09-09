@@ -17,7 +17,7 @@ trips               生成的攻略
 agent_traces        编排 trace（可观测性）
 ```
 
-> 知识库表（kb_documents / kb_chunks）随 RAG 阶段实现时加入，向量以 JSON 存取 + 内存余弦计算（ADR-002）。
+> 知识库表（kb_documents / kb_chunks）已随 kb_search（MVP 范围项 5）落地：向量以 JSON 存取 + 内存余弦计算（ADR-002）；embedding 不可用的切片以 NULL 向量入库，检索自动降级纯词面通道（字符二元组重叠算分）。
 
 ## 关键设计
 

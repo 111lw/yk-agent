@@ -14,6 +14,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from yk_agent.agents.bootstrap import build_default_registry
 from yk_agent.core.graph import build_graph
+from yk_agent.knowledge.retriever import KbRetriever
 from yk_agent.llm.provider import LLMProvider
 from yk_agent.mcp.map.provider import MapProvider
 from yk_agent.profile.models import UserProfile
@@ -69,7 +70,9 @@ class AppState:
         if store is not None and profile_repo is None:
             profile_repo = SqliteProfileRepository(store)
         self.profile_repo = profile_repo or InMemoryProfileRepository()
-        self.registry = build_default_registry(self.map_provider)
+        # 知识库检索器：无持久化 store 时不启用（纯测试场景）
+        self.kb = KbRetriever(store, provider) if store is not None else None
+        self.registry = build_default_registry(self.map_provider, kb=self.kb)
         self.graph: CompiledStateGraph = build_graph(
             self.registry, self.provider, skills=[load_skill("trip-planner")]
         )

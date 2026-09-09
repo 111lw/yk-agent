@@ -1,1 +1,7 @@
-"""RAG 知识库：文档灌入、切片、向量检索（kb_search）。检索双通道见 docs/04-user-profile.md。"""
+"""RAG 知识库：文档灌入、切片、混合检索（kb_search）。
+
+检索策略（docs/04 §双通道、ADR-002）：
+- 语义通道：query 与切片 embedding 内存余弦（向量存 SQLite JSON，不引入独立向量库）；
+- 词面通道：字符二元组重叠算分（零依赖，专有名词精确匹配强）；
+- embedding 不可用时自动降级为纯词面通道。
+"""

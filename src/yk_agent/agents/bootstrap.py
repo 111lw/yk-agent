@@ -10,11 +10,14 @@ from yk_agent.agents.budget_agent import BudgetAgentInput, BudgetAgentOutput, ma
 from yk_agent.agents.poi_agent import PoiAgentInput, PoiAgentOutput, make_poi_agent
 from yk_agent.agents.registry import AgentRegistry, AgentSpec
 from yk_agent.agents.route_agent import RouteAgentInput, RouteAgentOutput, make_route_agent
+from yk_agent.knowledge.retriever import KbRetriever
 from yk_agent.mcp.map.provider import MapProvider
 
 
-def build_default_registry(map_provider: MapProvider) -> AgentRegistry:
-    """以给定 map provider 构建默认注册表（测试可注入 MockMapProvider）。"""
+def build_default_registry(
+    map_provider: MapProvider, kb: KbRetriever | None = None
+) -> AgentRegistry:
+    """以给定 map provider（及可选知识库）构建默认注册表（测试可注入 Mock）。"""
     registry = AgentRegistry()
     registry.register(
         AgentSpec(
@@ -28,7 +31,7 @@ def build_default_registry(map_provider: MapProvider) -> AgentRegistry:
             output_schema=PoiAgentOutput,
             graph_node="poi-agent",
         ),
-        make_poi_agent(map_provider),
+        make_poi_agent(map_provider, kb=kb),
     )
     registry.register(
         AgentSpec(

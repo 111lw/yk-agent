@@ -29,7 +29,7 @@
 
 | 工具 | 所在层 | 说明 |
 |---|---|---|
-| `kb_search` | knowledge/ | 向量+标签混合检索知识库（见 04 双通道） |
+| `kb_search` | knowledge/ | 混合检索知识库：语义（embedding 余弦，向量存 SQLite JSON）为主 + 词面（字符二元组）兜底；embedding 不可用自动降级（见 04 双通道、ADR-002）。poi-agent 已接入，灌库：`python scripts/ingest_kb.py <json> [--no-embed]` |
 | `profile_lookup` | profile/ | 读当前用户画像切片（只读） |
 
 ## 模块划分（mcp/）

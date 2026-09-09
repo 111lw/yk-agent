@@ -95,6 +95,29 @@ CREATE TABLE IF NOT EXISTS agent_traces (
     created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_trace_session ON agent_traces (session_id, created_at);
+
+CREATE TABLE IF NOT EXISTS kb_documents (
+    id          TEXT PRIMARY KEY,
+    title       TEXT NOT NULL,
+    city        TEXT,
+    category    TEXT NOT NULL,
+    source      TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'ready',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS kb_chunks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id TEXT NOT NULL REFERENCES kb_documents(id) ON DELETE CASCADE,
+    content     TEXT NOT NULL,
+    chunk_index INTEGER NOT NULL,
+    city        TEXT,
+    category    TEXT NOT NULL,
+    embedding   TEXT,                -- JSON 浮点数组；NULL=未向量化（词面通道兜底）
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_chunk_doc ON kb_chunks (document_id);
+CREATE INDEX IF NOT EXISTS idx_chunk_city ON kb_chunks (city);
 """
 
 
@@ -322,6 +345,65 @@ class SqliteStore:
         ).fetchone()
         trips = await (await self._conn.execute("SELECT COUNT(*) c FROM trips")).fetchone()
         return {"sessions": sessions["c"], "trips": trips["c"]}
+
+    # —— 知识库 ——
+
+    async def save_document(
+        self,
+        *,
+        doc_id: str,
+        title: str,
+        city: str | None,
+        category: str,
+        source: str,
+        chunks: list[dict[str, Any]],  # [{content, embedding(list[float] | None)}]
+    ) -> int:
+        await self._conn.execute(  # type: ignore[union-attr]
+            """INSERT OR REPLACE INTO kb_documents (id, title, city, category, source, status)
+               VALUES (?, ?, ?, ?, ?, 'ready')""",
+            (doc_id, title, city, category, source),
+        )
+        await self._conn.execute("DELETE FROM kb_chunks WHERE document_id = ?", (doc_id,))  # type: ignore[union-attr]
+        for i, c in enumerate(chunks):
+            await self._conn.execute(
+                "INSERT INTO kb_chunks"
+                " (document_id, content, chunk_index, city, category, embedding)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    doc_id,
+                    c["content"],
+                    i,
+                    city,
+                    category,
+                    json.dumps(c["embedding"]) if c.get("embedding") else None,
+                ),
+            )
+        await self._conn.commit()
+        return len(chunks)
+
+    async def load_chunks(self, city: str | None = None) -> list[dict[str, Any]]:
+        """加载切片（可按城市过滤）。embedding 以 JSON 解包；None 表示未向量化。"""
+        sql = (
+            "SELECT c.id, c.content, c.city, c.category, c.embedding, d.title, d.source "
+            "FROM kb_chunks c JOIN kb_documents d ON d.id = c.document_id"
+        )
+        params: tuple = ()
+        if city:
+            sql += " WHERE c.city = ? OR c.city IS NULL"
+            params = (city,)
+        rows = await (await self._conn.execute(sql, params)).fetchall()  # type: ignore[union-attr]
+        return [
+            {
+                "chunk_id": r["id"],
+                "content": r["content"],
+                "city": r["city"],
+                "category": r["category"],
+                "title": r["title"],
+                "source": r["source"],
+                "embedding": json.loads(r["embedding"]) if r["embedding"] else None,
+            }
+            for r in rows
+        ]
 
     # —— 编排 trace ——
 

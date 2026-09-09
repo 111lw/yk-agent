@@ -11,6 +11,7 @@ import logging
 from pydantic import BaseModel, Field
 
 from yk_agent.agents.base import AgentPayload, parse_slot
+from yk_agent.knowledge.retriever import KbRetriever
 from yk_agent.mcp.base import run_tool
 from yk_agent.mcp.contracts.map import Poi, PoiSearchRequest
 from yk_agent.mcp.map.provider import MapProvider
@@ -36,6 +37,7 @@ class PoiAgentOutput(BaseModel):
     keywords: list[str]
     pois: list[Poi] = Field(default_factory=list)  # 已过画像 dislike 硬过滤
     filtered_count: int = 0  # 被画像过滤掉的数量（可解释性用）
+    kb_tips: list[str] = Field(default_factory=list)  # 知识库召回的目的地攻略要点
     note: str = ""
 
 
@@ -58,8 +60,8 @@ def _matches_dislike(poi: Poi, dislikes: list[str]) -> bool:
     return False
 
 
-def make_poi_agent(map_provider: MapProvider):
-    """工厂：注入地图 provider，返回 Registry 注册用执行体。"""
+def make_poi_agent(map_provider: MapProvider, kb: KbRetriever | None = None):
+    """工厂：注入地图 provider 与可选知识库检索器，返回 Registry 注册用执行体。"""
 
     async def run(payload: dict) -> dict:
         req = PoiAgentInput.model_validate(payload)
@@ -95,11 +97,22 @@ def make_poi_agent(map_provider: MapProvider):
         note = ""
         if failed:
             note = f"关键词 {failed} 检索失败（降级：缺失该类候选）"
+
+        # 知识库补充目的地攻略要点（失败静默跳过，不影响 POI 主产出）
+        kb_tips: list[str] = []
+        if kb is not None:
+            try:
+                hits = await kb.search(f"{city} 攻略 玩法", city=city, top_k=3)
+                kb_tips = [h["content"] for h in hits]
+            except Exception as e:  # noqa: BLE001
+                logger.warning("poi-agent 知识库检索失败（跳过）: %s", e)
+
         return PoiAgentOutput(
             city=city,
             keywords=keywords,
             pois=kept,
             filtered_count=len(unique) - len(kept),
+            kb_tips=kb_tips,
             note=note,
         ).model_dump()
 
